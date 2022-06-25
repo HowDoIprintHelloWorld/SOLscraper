@@ -15,7 +15,7 @@ import requests, nltk, time
 from deep_translator import GoogleTranslator
 from bs4 import BeautifulSoup as bs4
 from nltk.sentiment import SentimentIntensityAnalyzer
-import progressbar as progressbar2
+
 from progress.bar import Bar
 # URL strings because f-strings are annoying to use with this script
 URLb = "https://www.trustpilot.com/review/"
@@ -26,7 +26,7 @@ def scan(numofiters, company):
   ToBretL = []
   printmode = False
 
-  print(f"Scanning {company}s' public reviews...")
+  print(f"Scanning {company} public reviews...")
   # The reviews have many pages, so I have to iterate through all of them
   for i in range(1, numofiters):
     # Gets the page content and puts into into the bs4 parser or something
@@ -90,11 +90,13 @@ if __name__ == "__main__":
   print("Making translator object...")
   trs = GoogleTranslator(source='auto', target='en')
 
-  print("Running Sentiment Analysis AI on coop...")
+  print("\n>>>   Running Sentiment Analysis AI on coop...")
   coopscore = workon(coopl, "coop")
-  print("\nRunning Sentiment Analysis AI on migros...")
+  print("\n\n>>>   Running Sentiment Analysis AI on migros...")
   migrosscore = workon(migrosl, "migros")
+
+  # Calculate time taken
   print(f"\nMigros' score: {migrosscore}\nCoops' Score: {coopscore}")
-  t = f"{(time.time() - then)//60}m {round(time.time() - then - 60*((time.time() - then)//60), 2)}"
+  t = f"{(int(time.time() - then)//60)}:{round(time.time() - then - 60*((time.time() - then)//60), 2)}m"
   print(f"[i]   Finished in {t}")
   getwinner(migrosscore, coopscore)
