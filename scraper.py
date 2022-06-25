@@ -92,8 +92,9 @@ if __name__ == "__main__":
 
   print("Running Sentiment Analysis AI on coop...")
   coopscore = workon(coopl, "coop")
-  print("Running Sentiment Analysis AI on migros...")
+  print("\nRunning Sentiment Analysis AI on migros...")
   migrosscore = workon(migrosl, "migros")
   print(f"\nMigros' score: {migrosscore}\nCoops' Score: {coopscore}")
-  print(f"[i]   Finished in {time.time() - then}s!")
+  t = f"{(time.time() - then)//60}m {round(time.time() - then - 60*((time.time() - then)//60), 2)}"
+  print(f"[i]   Finished in {t}")
   getwinner(migrosscore, coopscore)
