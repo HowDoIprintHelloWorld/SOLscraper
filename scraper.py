@@ -1,102 +1,103 @@
-# To anyone reading this who understands my code:
-# 1) Please tell me how, I don't get it myself at this point
-# 2) This script will only work well at the time of writing. 
-#    For example, if more review pages are added, they won't 
-#    be taken into consideration by my script.
-
-# !!!!!
-# CHANGE THIS ACCORDINGLY!!!
-# !!!!!
-VADERINSTALLED = False
-# !!!!!
-# !!!!!
-
-import requests, nltk, time
-from deep_translator import GoogleTranslator
-from bs4 import BeautifulSoup as bs4
-from nltk.sentiment import SentimentIntensityAnalyzer
-
+import yfinance as yf
+from sys import argv, exit
+import pandas
+import time
 from progress.bar import Bar
-# URL strings because f-strings are annoying to use with this script
-URLb = "https://www.trustpilot.com/review/"
-URLe = ".ch?languages=al&page="
+
+DEVMODE = False
+
+def validatefile():
+  try:
+    with open("stocks.txt", "r"):
+      pass
+  except FileNotFoundError:
+    print("[!] File 'stocks.txt' does not exist or can not be opened")
+    exit(1)
+
+def getdata(stock, period):
+  stock, pricesstring = yf.Ticker(stock), stock
+  for price in list(stock.history(period="30d")["Close"].values):
+    pricesstring += " "+str(round(price, 3))
+  if DEVMODE:
+    pricesstring += " 32984902384"
+  return pricesstring
 
 
-def scan(numofiters, company):
-  ToBretL = []
-  printmode = False
+def getstonks():
+  validatefile()
+  stocks = []
 
-  print(f"Scanning {company} public reviews...")
-  # The reviews have many pages, so I have to iterate through all of them
-  for i in range(1, numofiters):
-    # Gets the page content and puts into into the bs4 parser or something
-    res = requests.get(URLb+company+URLe+str(i)).text
-    soup = bs4(res, "html.parser")
+  with open("stocks.txt", "r") as stocksfile:
+    for count, _ in enumerate(stocksfile):
+        pass  
+      
+  with open("stocks.txt", "r") as stocksfile:
+    count += 1
+    print(count)
+    bar = Bar(f'Fetching stocks for {str(count)} companies', max=count)
+    for line in stocksfile:
+      if line:
+        stocks.append(getdata(line.strip().upper(), "30d"))
+      bar.next()
+    bar.finish
+    print("")
+  with open("stocksdata.txt", "r") as stocksdatafile:
+    try: 
+      currentpercent = stocksdatafile.readline().split()[-1]
+    except IndexError:
+      print("[!] Something went wrong. Please run 'python3 stockalyser.py regen'")
+      exit(1)
+  with open("stocksdata.txt", "w") as stocksdatafile:
+    if ":" in currentpercent:
+      print("[!] Please regen and supply a percentage in 'stocksdata.txt' in line 1")
+    else:
+      stocksdatafile.write(str(time.time())+f" current and average difference in percent: {currentpercent}\n")
+      for pricesstring in stocks:
+        stocksdatafile.write(pricesstring+"\n")
+  print("[D] Done updating scuffed database")
 
-    # Finds all reviews and appends them to a list (Also filters out most unneeded things)
-    # Printmode is the filter that says when to append things and when not 
-    for review in soup.find_all("p", class_="typography_typography__QgicV"):
-      if "Claim your profile" in review.text:
-        break
-      if "62%" in review.text or "71%" in review.text:
-        printmode = True
-      if printmode == True and "%" not in review.text:
-        ToBretL.append(review.text)
-    printmode = True
-  return ToBretL
+def getaverage(pricelist):
+  avg = 0
+  for price in pricelist:
+    avg += float(price)
+  return avg / len(pricelist)
 
-# Uses black magic and a bit of math to figure out if input-text is positive or negative
-# Also makes sure that floating point inaccuracy won't mess things up
-def analyse(text2analyse, company, sia, score):
-  cs = sia.polarity_scores(text2analyse)
-  if cs["neg"] == 0 or cs["pos"] - cs["neg"] > 1:
-    return abs(cs["compound"])
-  else: 
-    return -abs(cs["compound"])
-  return (cs["compound"]*10000 + score*10000) / 10000
-
-def workon(l, company):
-  score = 0
-  bar = Bar(f'Processing data for {company}', max=len(l))
-  for i in range(len(l)):
-    test = trs.translate(l[i])
-    score = analyse(test, "coop", SentimentIntensityAnalyzer(), score)
-    bar.next()
-  bar.finish
-  return score
-
-# Checks who is the winner and how popular they are
-def getwinner(ms, cs):
-  print(f"The results are in! The winner is:")
-  if ms > cs:
-    print("Migros!")
-  else:
-    print("Coop!")
-
+def computediffs():
+  begun, diff = False, 0
+  with open("stocksdata.txt", "r") as stocksdatafile:
+    for line in stocksdatafile:
+      if begun:
+        pricelist = line.split()[1:]
+        development = float(pricelist[-1]) / getaverage(pricelist[:-1])
+        if development > 1 + diff or development < 1 - diff:
+          print(f"\n[!!!!!] Found a sussy stock:\n{line.split()[0]} has had a {round(development, 2)}% change in the last day!\n")
+      else:
+        diff = line.split()[-1]
+        if diff[-1] == "%":
+          diff = diff[:-1]
+        try:
+          diff = int(diff) / 100
+          begun = True
+        except Exception:
+          print("[!] Please supply a percentage in 'stocksdata.txt' in line 1")
+  print("[D] Done computing any irregularities")
+  
+def regen():
+  with open("stocksdata.txt", "w") as file:
+    file.write(str(time.time())+f" current and average difference in percent: {input('Percentage threshold: ')}\n")
+  if input("[?] Remake 'stocks.txt' as well? This will wipe everything currently written there... [y/n]:   ").lower().strip() == "y":
+    with open("stocks.txt", "w") as file:
+      file.write("")
+  print("[D] Done regenerating")
 
 if __name__ == "__main__":
-  # Installs wordlist 
-  then = time.time()
-  if not VADERINSTALLED:
-    print("Installing Sentiment Analysis wordlist")
-    nltk.download("vader_lexicon")
-
-  # Fetches wordlists and prints their length
-  coopl, migrosl = scan(8, "coop"), scan(12, "migros")
-  print(f"Coop data amount: {len(coopl)}\nMigros data amount: {len(migrosl)}")
-
-  # Makes a google translator object for us to easily use
-  # Also prints what it's doing to make my script more complicated than it actually is (and for debugging ;) )
-  print("Making translator object...")
-  trs = GoogleTranslator(source='auto', target='en')
-
-  print("\n>>>   Running Sentiment Analysis AI on coop...")
-  coopscore = workon(coopl, "coop")
-  print("\n\n>>>   Running Sentiment Analysis AI on migros...")
-  migrosscore = workon(migrosl, "migros")
-
-  # Calculate time taken
-  print(f"\nMigros' score: {migrosscore}\nCoops' Score: {coopscore}")
-  t = f"{(int(time.time() - then)//60)}:{round(time.time() - then - 60*((time.time() - then)//60), 2)}m"
-  print(f"[i]   Finished in {t}")
-  getwinner(migrosscore, coopscore)
+  funcd = {"update":getstonks, "calculate":computediffs, "regen":regen}
+  funcl = [option for option, func in funcd.items()]
+  try: 
+    if argv[1] in funcl:
+      funcd[argv[1]]()
+      exit(0)
+  except IndexError:
+    pass
+  print("[!] Usage: python3 stockalyser.py [update/calculate/regen]")
+  exit(1)
